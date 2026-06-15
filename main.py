@@ -8,14 +8,14 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "INFINITY GEN 24/7 Bot V3.1 FURY 🚫💸"
+    return "INFINITY GEN Bot V2 Stable 🚫💸"
 
-# ========= البيانات data.json =========
+# ========= البيانات =========
 DATA_FILE = 'data.json'
 def load_data():
     try:
         with open(DATA_FILE, 'r', encoding='utf-8') as f: return json.load(f)
-    except: return {"users": {}, "games": {}}
+    except: return {"users": {}}
 
 def save_data(data):
     with open(DATA_FILE, 'w', encoding='utf-8') as f: json.dump(data, f, ensure_ascii=False, indent=2)
@@ -23,7 +23,7 @@ def save_data(data):
 def get_user(uid, name="مجهول"):
     data = load_data()
     if uid not in data["users"]:
-        data["users"][uid] = {"points": 0, "name": name, "inventory": [], "multiplier_end": None, "wins": 0, "alive": True}
+        data["users"][uid] = {"points": 0, "name": name, "inventory": [], "multiplier_end": None, "wins": 0}
     data["users"][uid]["name"] = name
     return data["users"][uid]
 
@@ -38,19 +38,12 @@ def add_points(uid, name, amount):
     save_data(data)
     return user["points"]
 
+# ========= المتجر الخفيف =========
 SHOP = {
-    "درع": {"price": 200, "desc": "درع 🛡️"}, "مضاعف": {"price": 500, "desc": "مضاعف x2 لمدة 10د ⏳"},
-    "كشف": {"price": 150, "desc": "كشف 🔍"}, "قنبلة": {"price": 400, "desc": "قنبلة 💣"},
-    "كاتم": {"price": 600, "desc": "كاتم للمافيا 🤫"}, "درع_شرطي": {"price": 500, "desc": "درع شرطي 👮"},
-    "إنعاش": {"price": 700, "desc": "إنعاش ❤️‍🩹"}, "تصويت_ذهبي": {"price": 350, "desc": "تصويت ذهبي 🗳️"},
-    "جاسوس": {"price": 800, "desc": "جاسوس 🕵️"}, "انتحاري": {"price": 1000, "desc": "انتحاري 💀"}
+    "درع": {"price": 200, "desc": "درع 🛡️"},
+    "مضاعف": {"price": 500, "desc": "مضاعف x2 لمدة 10د ⏳"},
+    "قنبلة": {"price": 400, "desc": "قنبلة 💣"}
 }
-
-WORDS = ["قالمة", "نووي", "جلاد", "بوت", "يوتيوب", "نقاط", "متجر", "انفينيتي", "اسطورة", "جزائر"]
-QUESTIONS = [
-    {"q": "عاصمة الجزائر؟", "a": "الجزائر"}, {"q": "كم ولاية في الجزائر؟", "a": "58"},
-    {"q": "اسم بوتنا؟", "a": "انفينيتي"}, {"q": "ولاية 24؟", "a": "قالمة"}
-]
 
 # ========= البث =========
 def start_stream():
@@ -59,7 +52,7 @@ def start_stream():
     cmd = ['ffmpeg', '-re', '-stream_loop', '-1', '-i', 'video.mp4',
            '-c:v', 'libx264', '-preset', 'veryfast', '-b:v', '300k',
            '-s', '854x480', '-c:a', 'aac', '-b:a', '32k', '-f', 'flv', rtmp_url]
-    print("📺 [STREAM] بدا البث")
+    print("📺 البث شغال")
     while True: subprocess.run(cmd); time.sleep(5)
 
 # ========= البوت =========
@@ -68,16 +61,17 @@ BOT_CHANNEL_ID = None
 
 def start_bot():
     global BOT_CHANNEL_ID
-    print("🤖 [BOT] جاري التشغيل...")
+    print("🤖 البوت يطلع...")
     creds = Credentials.from_authorized_user_info(json.loads(os.environ.get('TOKEN_JSON')))
     youtube = build('youtube', 'v3', credentials=creds)
     
-    # جيب ID تاع البوت باه ما يردش على روحو
     try:
         ch = youtube.channels().list(part="id", mine=True).execute()
         BOT_CHANNEL_ID = ch['items'][0]['id']
-        print(f"✅ [BOT] ID البوت: {BOT_CHANNEL_ID}")
-    except Exception as e: print(f"💀 [BOT] ما قدرتش نجيب ID: {e}")
+        print(f"✅ ID البوت: {BOT_CHANNEL_ID}")
+    except Exception as e: 
+        print(f"💀 خطأ ID: {e}")
+        return
 
     live_chat_id = None
     while not live_chat_id:
@@ -85,13 +79,11 @@ def start_bot():
             bc = youtube.liveBroadcasts().list(part="snippet", broadcastStatus="active").execute()
             if bc['items']:
                 live_chat_id = bc['items'][0]['snippet']['liveChatId']
-                print(f"✅ [BOT] لقيت الشات: {live_chat_id}")
+                print(f"✅ لقيت الشات")
             else: 
-                print("⏳ [BOT] نستنى في لايف...")
+                print("⏳ نستنى في لايف...")
                 time.sleep(5)
-        except Exception as e: 
-            print(f"💀 [BOT] خطأ في البحث عن اللايف: {e}")
-            time.sleep(10)
+        except: time.sleep(10)
 
     def send(text):
         try:
@@ -99,16 +91,16 @@ def start_bot():
                 "snippet": {"liveChatId": live_chat_id, "type": "textMessageEvent",
                 "textMessageDetails": {"messageText": text}}
             }).execute()
-            print(f"📤 [BOT] بعثت: {text}")
-        except Exception as e: print(f"💀 [SEND] {e}")
+            print(f"📤 {text}")
+        except Exception as e: print(f"💀 Send: {e}")
 
-    send("🚫💸 البوت INFINITY GEN طلع! اكتب سلام باه نبداو")
+    send("🚫💸 البوت V2 طلع! الأوامر: سلام | نقاطي | بنق | توب | متجر | تخمين start | xo start | rps start")
 
-    # ===== دوال الألعاب =====
+    # ===== الألعاب الخفيفة لي كانت خدامة =====
     def game_takhmin():
         num = random.randint(1, 100)
         active_games[live_chat_id] = {"type": "takhmin", "num": num, "tries": 0}
-        send("🎲 بدات لعبة التخمين! خمن رقم من 1 لـ 100 🚫💸")
+        send("🎲 تخمين بدا! رقم من 1 لـ 100 🚫💸")
 
     def game_xo(): 
         b = ["1️⃣","2️⃣","3️⃣","4️⃣","5️⃣","6️⃣","7️⃣","8️⃣","9️⃣"]
@@ -117,7 +109,7 @@ def start_bot():
 
     def game_rps():
         active_games[live_chat_id] = {"type": "rps", "players": {}}
-        send("✂️ حجر ورقة مقص! اكتبو: حجر او ورقة او مقص. النتيجة بعد 10 ثواني 🚫💸")
+        send("✂️ حجر ورقة مقص! اكتبو: حجر او ورقة او مقص. النتيجة بعد 10ث 🚫💸")
         threading.Timer(10, end_rps).start()
 
     def end_rps():
@@ -141,25 +133,32 @@ def start_bot():
                 author = item['authorDetails']['displayName']
                 uid = item['authorDetails']['channelId']
                 
-                # ما تردش على روحك يا بوت
                 if uid == BOT_CHANNEL_ID: continue
+                print(f"📩 {author}: {msg}")
                 
-                print(f"📩 [{author}]: {msg}")
                 user = get_user(uid, author)
-                add_points(uid, author, 1)
+                points = add_points(uid, author, 1)
 
-                # === أوامر أساسية ===
+                # === أوامر أساسية خدامة 100% ===
                 if msg == 'سلام': send(f"وعليكم السلام {author} 👋")
                 elif msg == 'نقاطي': send(f"{author} رصيدك: {user['points']} 💰 | فوز: {user['wins']}")
                 elif msg == 'بنق': send(f"Pong! ⚡🚫💸")
-                elif msg == 'متجر': send("🛒 المتجر:\n" + "\n".join([f"شراء {k} = {v['price']}" for k, v in SHOP.items()]))
                 elif msg == 'توب':
                     data = load_data()
                     top = sorted(data["users"].items(), key=lambda x: x[1]["points"], reverse=True)[:10]
                     top_text = "👑 توب 10:\n" + "\n".join([f"{i+1}. {u[1]['name']} - {u[1]['points']}" for i, u in enumerate(top)])
                     send(top_text)
                 
-                # === شراء ===
+                # === المتجر ===
+                elif msg == 'متجر': send("🛒 المتجر:\n" + "\n".join([f"شراء {k} = {v['price']}" for k, v in SHOP.items()]))
+                elif msg == 'شنطة': send(f"🎒 شنطة {author}: {', '.join(user['inventory']) or 'فارغة'}")
+                elif msg == 'مضاعف':
+                    if "مضاعف" in user["inventory"]:
+                        user["inventory"].remove("مضاعف")
+                        user["multiplier_end"] = (datetime.now() + timedelta(minutes=10)).isoformat()
+                        save_data(load_data())
+                        send(f"⚡ {author} فعلت المضاعف x2 لمدة 10د!")
+                    else: send(f"{author} ما عندكش مضاعف. اشريه من المتجر")
                 elif msg.startswith('شراء '):
                     item = msg.split('شراء ')[1]
                     if item in SHOP and user["points"] >= SHOP[item]["price"]:
@@ -167,9 +166,9 @@ def start_bot():
                         user["inventory"].append(item)
                         save_data(load_data())
                         send(f"✅ {author} شريت {SHOP[item]['desc']} 🚫💸")
-                    else: send(f"❌ {author} ما تقدرش تشري")
+                    else: send(f"❌ {author} نقاطك ما تكفيش")
 
-                # === الألعاب فوري ===
+                # === الألعاب الخفيفة ===
                 elif live_chat_id not in active_games:
                     if msg == 'تخمين start': game_takhmin()
                     elif msg == 'xo start': game_xo()
@@ -218,7 +217,7 @@ def start_bot():
             next_page_token = res.get('nextPageToken')
             time.sleep(3)
         except Exception as e:
-            print(f"💀 [LOOP] Error: {e}")
+            print(f"💀 Error: {e}")
             time.sleep(15)
 
 if __name__ == "__main__":
