@@ -1,6 +1,13 @@
+from flask import Flask
 import subprocess, threading, os, time, json, random
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
+
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "Bot + Stream is running 🚫💸"
 
 # 1. نخزن النقاط في ملف json بسيط
 POINTS_FILE = 'points.json'
@@ -33,37 +40,27 @@ def start_stream():
         subprocess.run(cmd)
         time.sleep(5)
 
-# 3. البوت تاع الشات
+# 3. البوت تاع الشات - يعس البث كل 3 ثواني
 def start_bot():
     print("🤖 [BOT] بديت نعس على البث...")
-
     creds = Credentials.from_authorized_user_info(json.loads(os.environ.get('TOKEN_JSON')))
     youtube = build('youtube', 'v3', credentials=creds)
-
     live_chat_id = None
 
-    # 1. لوب يعس حتى يلقى البث
     while not live_chat_id:
         try:
-            broadcasts = youtube.liveBroadcasts().list(
-                part="snippet",
-                broadcastStatus="active"
-            ).execute()
-
+            broadcasts = youtube.liveBroadcasts().list(part="snippet", broadcastStatus="active").execute()
             if broadcasts['items']:
                 live_chat_id = broadcasts['items'][0]['snippet']['liveChatId']
                 print(f"✅ [BOT] لقيت البث! liveChatId: {live_chat_id}")
             else:
                 print("⏳ [BOT] مزال ما طلعش البث... نعاود بعد 3 ثواني")
                 time.sleep(3)
-
         except Exception as e:
             print(f"💀 [BOT] خطأ في البحث عن البث: {e}")
             time.sleep(10)
 
-    # 2. كي يلقاه يبدا يقرا الشات
     print("🤖 [BOT] بديت نقرا في الشات 🚫💸")
-
     def send_msg(text):
         try:
             youtube.liveChatMessages().insert(part="snippet", body={
@@ -78,14 +75,11 @@ def start_bot():
             response = youtube.liveChatMessages().list(
                 liveChatId=live_chat_id, part="snippet,authorDetails", pageToken=next_page_token
             ).execute()
-
             for item in response['items']:
                 msg = item['snippet']['displayMessage'].strip()
                 author = item['authorDetails']['displayName']
                 author_id = item['authorDetails']['channelId']
-
-                new_total = add_points(author_id, 1)
-
+                add_points(author_id, 1)
                 if msg.lower() == '!سلام':
                     send_msg(f"وعليكم السلام @{author} 🚫💸")
                 elif msg.lower() == '!نقاطي':
@@ -99,15 +93,14 @@ def start_bot():
                         send_msg(f"@{author} ربحت 5 نقاط! مجموعك {get_points(author_id)} 🚫💸")
                     else:
                         send_msg(f"@{author} خسرت 😭 جرب مرة أخرى")
-                elif msg.lower() == '!توب':
-                    data = load_points()
-                    top = sorted(data.items(), key=lambda x: x[1], reverse=True)[:3]
-                    msg_top = "🏆 توب 3: "
-                    for i, (uid, pts) in enumerate(top): msg_top += f"{i+1}- {pts}ن | "
-                    send_msg(msg_top + "🚫💸")
-
             next_page_token = response.get('nextPageToken')
             time.sleep(5)
         except Exception as e:
             print(f"💀 [BOT] Error في الشات: {e}")
             time.sleep(15)
+
+if __name__ == "__main__":
+    threading.Thread(target=lambda: app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 10000))), daemon=True).start()
+    threading.Thread(target=start_stream, daemon=True).start()
+    threading.Thread(target=start_bot, daemon=True).start()
+    while True: time.sleep(60)
