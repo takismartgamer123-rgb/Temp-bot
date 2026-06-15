@@ -8,7 +8,7 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "INFINITY GEN Bot V2 Stable 🚫💸"
+    return "INFINITY GEN Bot V2 Stable No-Delay 🚫💸"
 
 # ========= البيانات =========
 DATA_FILE = 'data.json'
@@ -38,11 +38,12 @@ def add_points(uid, name, amount):
     save_data(data)
     return user["points"]
 
-# ========= المتجر الخفيف =========
+# ========= المتجر =========
 SHOP = {
     "درع": {"price": 200, "desc": "درع 🛡️"},
     "مضاعف": {"price": 500, "desc": "مضاعف x2 لمدة 10د ⏳"},
-    "قنبلة": {"price": 400, "desc": "قنبلة 💣"}
+    "قنبلة": {"price": 400, "desc": "قنبلة 💣"},
+    "كشف": {"price": 150, "desc": "كشف 🔍"}
 }
 
 # ========= البث =========
@@ -79,7 +80,7 @@ def start_bot():
             bc = youtube.liveBroadcasts().list(part="snippet", broadcastStatus="active").execute()
             if bc['items']:
                 live_chat_id = bc['items'][0]['snippet']['liveChatId']
-                print(f"✅ لقيت الشات")
+                print(f"✅ لقيت الشات: {live_chat_id}")
             else: 
                 print("⏳ نستنى في لايف...")
                 time.sleep(5)
@@ -94,9 +95,9 @@ def start_bot():
             print(f"📤 {text}")
         except Exception as e: print(f"💀 Send: {e}")
 
-    send("🚫💸 البوت V2 طلع! الأوامر: سلام | نقاطي | بنق | توب | متجر | تخمين start | xo start | rps start")
+    send("🚫💸 البوت V2 طلع! فوري بلا انتظار | سلام | نقاطي | بنق | توب | متجر | تخمين start | xo start | rps start")
 
-    # ===== الألعاب الخفيفة لي كانت خدامة =====
+    # ===== الألعاب =====
     def game_takhmin():
         num = random.randint(1, 100)
         active_games[live_chat_id] = {"type": "takhmin", "num": num, "tries": 0}
@@ -139,7 +140,7 @@ def start_bot():
                 user = get_user(uid, author)
                 points = add_points(uid, author, 1)
 
-                # === أوامر أساسية خدامة 100% ===
+                # === أوامر أساسية ===
                 if msg == 'سلام': send(f"وعليكم السلام {author} 👋")
                 elif msg == 'نقاطي': send(f"{author} رصيدك: {user['points']} 💰 | فوز: {user['wins']}")
                 elif msg == 'بنق': send(f"Pong! ⚡🚫💸")
@@ -168,7 +169,7 @@ def start_bot():
                         send(f"✅ {author} شريت {SHOP[item]['desc']} 🚫💸")
                     else: send(f"❌ {author} نقاطك ما تكفيش")
 
-                # === الألعاب الخفيفة ===
+                # === الألعاب فوري ===
                 elif live_chat_id not in active_games:
                     if msg == 'تخمين start': game_takhmin()
                     elif msg == 'xo start': game_xo()
