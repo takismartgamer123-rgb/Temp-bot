@@ -35,22 +35,34 @@ def start_stream():
 
 # 3. البوت تاع الشات
 def start_bot():
-    print("🤖 [BOT] نستنا 30 ثانية باه البث يطلع...")
-    time.sleep(30)
+    print("🤖 [BOT] بديت نعس على البث...")
 
     creds = Credentials.from_authorized_user_info(json.loads(os.environ.get('TOKEN_JSON')))
     youtube = build('youtube', 'v3', credentials=creds)
 
-    try:
-        broadcasts = youtube.liveBroadcasts().list(part="snippet", broadcastStatus="active").execute()
-        if not broadcasts['items']:
-            print("💀 [BOT] ما لقيتش بث مباشر خدام")
-            return
-        live_chat_id = broadcasts['items'][0]['snippet']['liveChatId']
-        print(f"✅ [BOT] لقيت الشات: {live_chat_id}")
-    except Exception as e:
-        print(f"💀 [BOT] مشكل في جلب liveChatId: {e}")
-        return
+    live_chat_id = None
+
+    # 1. لوب يعس حتى يلقى البث
+    while not live_chat_id:
+        try:
+            broadcasts = youtube.liveBroadcasts().list(
+                part="snippet",
+                broadcastStatus="active"
+            ).execute()
+
+            if broadcasts['items']:
+                live_chat_id = broadcasts['items'][0]['snippet']['liveChatId']
+                print(f"✅ [BOT] لقيت البث! liveChatId: {live_chat_id}")
+            else:
+                print("⏳ [BOT] مزال ما طلعش البث... نعاود بعد 3 ثواني")
+                time.sleep(3)
+
+        except Exception as e:
+            print(f"💀 [BOT] خطأ في البحث عن البث: {e}")
+            time.sleep(10)
+
+    # 2. كي يلقاه يبدا يقرا الشات
+    print("🤖 [BOT] بديت نقرا في الشات 🚫💸")
 
     def send_msg(text):
         try:
@@ -72,10 +84,8 @@ def start_bot():
                 author = item['authorDetails']['displayName']
                 author_id = item['authorDetails']['channelId']
 
-                # كل رسالة = 1 نقطة
                 new_total = add_points(author_id, 1)
 
-                # الأوامر
                 if msg.lower() == '!سلام':
                     send_msg(f"وعليكم السلام @{author} 🚫💸")
                 elif msg.lower() == '!نقاطي':
@@ -84,7 +94,7 @@ def start_bot():
                 elif msg.lower() == '!بنق':
                     send_msg(f"Pong! البوت حي 🚫💸")
                 elif msg.lower() == '!حظ':
-                    if random.random() > 0.4: # 60% ربح
+                    if random.random() > 0.4:
                         add_points(author_id, 5)
                         send_msg(f"@{author} ربحت 5 نقاط! مجموعك {get_points(author_id)} 🚫💸")
                     else:
@@ -99,11 +109,5 @@ def start_bot():
             next_page_token = response.get('nextPageToken')
             time.sleep(5)
         except Exception as e:
-            print(f"💀 [BOT] Error: {e}")
+            print(f"💀 [BOT] Error في الشات: {e}")
             time.sleep(15)
-
-if __name__ == "__main__":
-    threading.Thread(target=start_stream, daemon=True).start()
-    threading.Thread(target=start_bot, daemon=True).start()
-    # نخليو الكونتاينر حي
-    while True: time.sleep(60)
