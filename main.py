@@ -1,4 +1,4 @@
-import os, json, threading, time, random, requests
+import os, json, threading, time, random, subprocess
 from flask import Flask
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
@@ -6,21 +6,12 @@ from googleapiclient.discovery import build
 from datetime import datetime, timedelta
 
 app = Flask(__name__)
-
-# ========== الإعدادات ==========
 TOKEN_JSON = os.getenv('TOKEN_JSON')
-VIDEO_ID = os.getenv('VIDEO_ID') # اختياري
 BOT_NAME = "🚫💸 INFINITY GEN"
 PREFIX = "."
 
-# ========== قاعدة البيانات ==========
-db = {
-    'users': {}, # {user_id: {'points': 0, 'items': [], 'x2_until': None}}
-    'games': {}, # الألعاب الشغالة
-    'live_chat_id': None
-}
+db = {'users': {}, 'games': {}, 'live_chat_id': None, 'video_id': None}
 
-# ========== المتجر النووي ==========
 SHOP = {
     'درع': {'price': 200, 'desc': 'يحميك من القتل مرة'},
     'مضاعف': {'price': 500, 'desc': 'x2 نقاط لمدة 10د', 'duration': 600},
@@ -34,7 +25,6 @@ SHOP = {
     'انتحاري': {'price': 1000, 'desc': 'تقتل 2 و تموت'}
 }
 
-# ========== دوال مساعدة ==========
 def get_creds():
     creds_data = json.loads(TOKEN_JSON)
     creds = Credentials.from_authorized_user_info(creds_data)
@@ -45,16 +35,50 @@ def get_creds():
 def get_youtube():
     return build('youtube', 'v3', credentials=get_creds())
 
+def start_youtube_stream():
+    yt = get_youtube()
+    broadcast = yt.liveBroadcasts().insert(
+        part="snippet,status,contentDetails",
+        body={
+            "snippet": {"title": f"{BOT_NAME} 24/7", "scheduledStartTime": datetime.utcnow().isoformat() + "Z"},
+            "status": {"privacyStatus": "public"},
+            "contentDetails": {"enableAutoStart": True, "enableDvr": True}
+        }
+    ).execute()
+
+    stream = yt.liveStreams().insert(
+        part="snippet,cdn",
+        body={
+            "snippet": {"title": "INFINITY Stream"},
+            "cdn": {"ingestionType": "rtmp", "resolution": "720p", "frameRate": "30fps"}
+        }
+    ).execute()
+
+    yt.liveBroadcasts().bind(part="id", id=broadcast["id"], streamId=stream["id"]).execute()
+    rtmp_url = stream['cdn']['ingestionInfo']['ingestionAddress']
+    stream_key = stream['cdn']['ingestionInfo']['streamName']
+    full_rtmp = f"{rtmp_url}/{stream_key}"
+
+    print(f"📺 [STREAM] لايف جديد: https://youtube.com/watch?v={broadcast['id']}")
+
+    # بث video.mp4 720p 24fps لوب
+    cmd = [
+        'ffmpeg', '-re', '-stream_loop', '-1', '-i', 'video.mp4',
+        '-c:v', 'libx264', '-preset', 'veryfast', '-b:v', '2000k',
+        '-maxrate', '2000k', '-bufsize', '4000k', '-pix_fmt', 'yuv420p',
+        '-r', '24', '-g', '48', '-c:a', 'aac', '-b:a', '128k', '-ar', '44100',
+        '-f', 'flv', full_rtmp
+    ]
+    subprocess.Popen(cmd)
+    db['video_id'] = broadcast["id"]
+    return broadcast["id"]
+
 def send_msg(msg):
     try:
         yt = get_youtube()
         yt.liveChatMessages().insert(
             part="snippet",
-            body={"snippet": {
-                "liveChatId": db['live_chat_id'],
-                "type": "textMessageEvent",
-                "textMessageDetails": {"messageText": msg}
-            }}
+            body={"snippet": {"liveChatId": db['live_chat_id'], "type": "textMessageEvent", "textMessageDetails": {"messageText": msg}}}
         ).execute()
         print(f"📤 [BOT] بعثت: {msg}")
     except Exception as e:
@@ -63,9 +87,7 @@ def send_msg(msg):
 def add_points(user_id, user_name, pts):
     if user_id not in db['users']:
         db['users'][user_id] = {'points': 0, 'items': [], 'x2_until': None, 'name': user_name}
-
     user = db['users'][user_id]
-    # تشيك المضاعف
     if user['x2_until'] and datetime.now() < user['x2_until']:
         pts *= 2
     user['points'] += pts
@@ -75,174 +97,93 @@ def get_user(user_id):
         db['users'][user_id] = {'points': 0, 'items': [], 'x2_until': None, 'name': 'مجهول'}
     return db['users'][user_id]
 
-# ========== Anti-AFK 80 ثانية ==========
 def anti_afk(game_id):
     time.sleep(80)
     game = db['games'].get(game_id)
     if game and len(game['players']) == 1:
-        bot_id = 'bot_infinity'
-        game['players'][bot_id] = BOT_NAME
+        game['players']['bot_infinity'] = BOT_NAME
         send_msg(f"{BOT_NAME} دخلت باه نكسر الروتين 🚫💸")
-        start_game(game_id)
 
-# ========== معالجة الأوامر ==========
 def handle_cmd(author, msg):
     user_id = author['channelId']
     user_name = author['displayName']
-    add_points(user_id, user_name, 1) # كل رسالة +1 نقطة
+    add_points(user_id, user_name, 1)
 
-    if not msg.startswith(PREFIX):
-        return
-
+    if not msg.startswith(PREFIX): return
     cmd = msg[1:].split()[0]
     args = msg[1:].split()[1:]
 
-    # أوامر أساسية
-    if cmd == 'سلام':
-        send_msg(f"وعليكم السلام {user_name} 🚫💸")
-
-    elif cmd == 'نقاطي':
-        pts = get_user(user_id)['points']
-        send_msg(f"{user_name} رصيدك: {pts} نقطة 💰")
-
+    if cmd == 'سلام': send_msg(f"وعليكم السلام {user_name} 🚫💸")
+    elif cmd == 'نقاطي': send_msg(f"{user_name} رصيدك: {get_user(user_id)['points']} نقطة 💰")
+    elif cmd == 'بنق': send_msg("بونق 🚫💸 البوت حي")
     elif cmd == 'توب':
-        top = sorted(db['users'].items(), key=lambda x: x[1]['points'], reverse=True)[:10]
-        txt = "👑 توب 10 جلادين:\n"
-        for i, (uid, data) in enumerate(top, 1):
-            txt += f"{i}. {data['name']} - {data['points']} نقطة\n"
+        top = sorted(db['users'].items(), key=lambda x: x[1]['points'], reverse=True)[:5]
+        txt = "👑 توب 5:\n" + "\n".join([f"{i}. {d['name']} - {d['points']}" for i, (_, d) in enumerate(top, 1)])
         send_msg(txt)
-
-    elif cmd == 'بنق':
-        send_msg("بونق 🚫💸 البوت حي")
-
     elif cmd == 'متجر':
-        txt = "🛒 المتجر النووي:\n"
-        for item, data in SHOP.items():
-            txt += f"{PREFIX}شراء {item} = {data['price']} نقطة - {data['desc']}\n"
+        txt = "🛒 المتجر:\n" + "\n".join([f"{PREFIX}شراء {i} = {d['price']}" for i,d in SHOP.items()])
         send_msg(txt)
-
     elif cmd == 'شراء' and args:
         item = args[0]
-        if item not in SHOP:
-            send_msg("هذا العنصر مكاش في المتجر 🚫💸")
-            return
+        if item not in SHOP: return send_msg("مكاش في المتجر 🚫💸")
         user = get_user(user_id)
         price = SHOP[item]['price']
-        if user['points'] < price:
-            send_msg(f"رصيدك ناقص يا {user_name}. لازم {price} نقطة")
-            return
+        if user['points'] < price: return send_msg(f"رصيدك ناقص. لازم {price}")
         user['points'] -= price
-        if item == 'مضاعف':
-            user['x2_until'] = datetime.now() + timedelta(seconds=SHOP[item]['duration'])
-        else:
-            user['items'].append(item)
-        send_msg(f"✅ {user_name} شرا {item} بـ {price} نقطة")
-
+        if item == 'مضاعف': user['x2_until'] = datetime.now() + timedelta(seconds=SHOP[item]['duration'])
+        else: user['items'].append(item)
+        send_msg(f"✅ {user_name} شرا {item}")
     elif cmd == 'شنطة':
         items = get_user(user_id)['items']
-        if not items:
-            send_msg(f"{user_name} شنطتك فارغة 🗿")
-        else:
-            send_msg(f"🎒 شنطة {user_name}: {', '.join(items)}")
+        send_msg(f"🎒 شنطة {user_name}: {', '.join(items) if items else 'فارغة'}")
+    elif cmd == 'xo' and 'start' in args:
+        game_id = f"xo_{time.time()}"
+        db['games'][game_id] = {'type': 'xo', 'players': {user_id: user_name}}
+        send_msg(f"🎮 {user_name} فتح XO. اكتب {PREFIX}ادخل")
+        threading.Thread(target=anti_afk, args=[game_id]).start()
 
-    # لعبة XO كمثال
-    elif cmd == 'xo':
-        if 'start' in args:
-            game_id = f"xo_{time.time()}"
-            db['games'][game_id] = {'type': 'xo', 'players': {user_id: user_name}, 'board': ['1','2','3','4','5','6','7','8','9']}
-            send_msg(f"🎮 {user_name} فتح طاولة XO. اكتب {PREFIX}ادخل للدخول")
-            threading.Thread(target=anti_afk, args=[game_id]).start()
-
-    elif cmd == 'ادخل':
-        for gid, game in db['games'].items():
-            if user_id not in game['players']:
-                game['players'][user_id] = user_name
-                send_msg(f"{user_name} دخل للعبة ✅")
-                if len(game['players']) == 2:
-                    start_game(gid)
-                return
-        send_msg("مكاش لعبة مفتوحة ضرك")
-
-def start_game(game_id):
-    game = db['games'][game_id]
-    if game['type'] == 'xo':
-        board = game['board']
-        send_msg(f"🎮 XO بدات:\n{board[0]}|{board[1]}|{board[2]}\n{board[3]}|{board[4]}|{board[5]}\n{board[6]}|{board[7]}|{board[8]}")
-
-# ========== الحماية ضد الزومبي الأطرش ==========
 def get_live_chat_id(youtube):
-    global db
     try:
-        if VIDEO_ID:
-            vid = VIDEO_ID
-        else:
-            # جيب اللايف تاع قناتك تلقائي
-            req = youtube.liveBroadcasts().list(part="snippet", broadcastStatus="active", broadcastType="all")
-            res = req.execute()
-            if not res['items']:
-                return None
-            vid = res['items'][0]['id']
-
-        req = youtube.videos().list(part="liveStreamingDetails", id=vid)
+        req = youtube.videos().list(part="liveStreamingDetails", id=db['video_id'])
         res = req.execute()
         db['live_chat_id'] = res['items'][0]['liveStreamingDetails']['activeLiveChatId']
         return True
-    except:
-        return False
+    except: return False
 
 def listen_chat():
-    fail_count = 0
     while True:
         try:
             yt = get_youtube()
-
-            # حماية الزومبي: اذا 3 دقايق ما لقاش الشات يعاود
             if not db['live_chat_id']:
                 if not get_live_chat_id(yt):
-                    fail_count += 1
-                    if fail_count >= 3:
-                        print("🧟 [BOT] الزومبي الأطرش! نعاود بعد 60ث")
-                        time.sleep(60)
-                        fail_count = 0
                     time.sleep(20)
                     continue
-
-            fail_count = 0
             req = yt.liveChatMessages().list(liveChatId=db['live_chat_id'], part="snippet,authorDetails")
             res = req.execute()
-
             for item in res['items']:
-                msg = item['snippet']['displayMessage']
-                author = item['authorDetails']
-                handle_cmd(author, msg)
-
+                handle_cmd(item['authorDetails'], item['snippet']['displayMessage'])
             time.sleep(5)
-
         except Exception as e:
             print(f"💀 [BOT] خطأ: {e}")
-            db['live_chat_id'] = None # حماية الزومبي
+            db['live_chat_id'] = None
             time.sleep(15)
 
-# ========== تشغيل البوت ==========
 def run_bot():
     print("🚀 [BOT] بدا الـ Thread تاع البوت")
-    if not TOKEN_JSON:
-        print("💀 [BOT] TOKEN_JSON مكاش")
-        return
-    print("✅ [BOT] لقيت TOKEN_JSON")
+    if not TOKEN_JSON: return print("💀 [BOT] TOKEN_JSON مكاش")
+    try:
+        start_youtube_stream()
+        time.sleep(20) # خلي البث يطلع
+        send_msg(f"{BOT_NAME} طلع 24/7 🚫💸")
+    except Exception as e:
+        print(f"💀 [STREAM] فشل: {e}")
     print("🤖 [BOT] Credentials صحاح")
-    print("🤖 [BOT] YouTube API جاهز")
     listen_chat()
 
 @app.route('/')
-def home():
-    return f"{BOT_NAME} حي 24/7 🚫💸"
-
+def home(): return f"{BOT_NAME} حي"
 @app.route('/ping')
-def ping():
-    return "pong" # لـ UptimeRobot
+def ping(): return "pong"
 
 threading.Thread(target=run_bot, daemon=True).start()
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=10000)
+if __name__ == '__main__': app.run(host='0.0.0.0', port=10000)
