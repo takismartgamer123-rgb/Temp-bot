@@ -8,9 +8,9 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "INFINITY GEN 24/7 Bot V3 - 100% 🚫💸"
+    return "INFINITY GEN 24/7 Bot V3 FURY 🚫💸"
 
-# ========= البيانات =========
+# ========= البيانات data.json =========
 DATA_FILE = 'data.json'
 def load_data():
     try:
@@ -38,7 +38,7 @@ def add_points(uid, name, amount):
     save_data(data)
     return user["points"]
 
-# ========= المتجر 100% =========
+# ========= المتجر النووي الكامل =========
 SHOP = {
     "درع": {"price": 200, "desc": "درع 🛡️"},
     "مضاعف": {"price": 500, "desc": "مضاعف x2 لمدة 10د ⏳"},
@@ -52,7 +52,6 @@ SHOP = {
     "انتحاري": {"price": 1000, "desc": "انتحاري 💀"}
 }
 
-# ========= قوائم الألعاب =========
 WORDS = ["قالمة", "نووي", "جلاد", "بوت", "يوتيوب", "نقاط", "متجر", "انفينيتي", "اسطورة", "جزائر", "مملكة", "قنبلة", "مافيا", "كنز"]
 QUESTIONS = [
     {"q": "عاصمة الجزائر؟", "a": "الجزائر"},
@@ -81,7 +80,9 @@ def start_bot():
     while not live_chat_id:
         try:
             bc = youtube.liveBroadcasts().list(part="snippet", broadcastStatus="active").execute()
-            if bc['items']: live_chat_id = bc['items'][0]['snippet']['liveChatId']
+            if bc['items']: 
+                live_chat_id = bc['items'][0]['snippet']['liveChatId']
+                print(f"✅ [BOT] لقيت البث!")
             else: time.sleep(3)
         except: time.sleep(10)
 
@@ -93,7 +94,7 @@ def start_bot():
             }).execute()
         except: pass
 
-    # ===== كل دوال الألعاب 1-16 =====
+    # ===== دوال الألعاب 1-16 =====
     def game_xo(): 
         b = ["1️⃣","2️⃣","3️⃣","4️⃣","5️⃣","6️⃣","7️⃣","8️⃣","9️⃣"]
         active_games[live_chat_id] = {"type": "xo", "board": b, "turn": "X"}
@@ -115,7 +116,7 @@ def start_bot():
         game["mafia"] = players[0]
         game["doctor"] = players[1] if len(players) > 1 else None
         game["phase"] = "night"
-        send(f"🌙 ليل المافيا بدا! المافيا: سري | الطبيب: سري | الباقي شعب\nالمافيا اكتب 'قتل @اسم' | الطبيب 'انقذ @اسم'")
+        send(f"🌙 ليل المافيا بدا! المافيا: سري | الطبيب: سري\nالمافيا اكتب 'قتل @اسم' | الطبيب 'انقذ @اسم'")
 
     def game_rps():
         active_games[live_chat_id] = {"type": "rps", "players": {}}
@@ -160,7 +161,7 @@ def start_bot():
         send(f"⌨️ سباق كتابة! اكتب:\n{text} 🚫💸")
 
     def game_kalimat():
-        active_games[live_chat_id] = {"type": "kalimat", "words": [], "start": time.time()}
+        active_games[live_chat_id] = {"type": "kalimat", "words": {}, "start": time.time()}
         send("⚡ حرب كلمات 60ث! اكتب اكبر عدد كلمات مختلفة. ابدا ضرك! 🚫💸")
         threading.Timer(60, end_kalimat).start()
 
@@ -169,17 +170,15 @@ def start_bot():
         game = active_games[live_chat_id]
         if not game["words"]: send("😭 حتى واحد ما كتب")
         else:
-            scores = {}
-            for uid, word in game["words"]: scores[uid] = scores.get(uid, 0) + 1
-            winner = max(scores, key=scores.get)
+            winner = max(game["words"], key=game["words"].get)
             winner_data = get_user(winner)
-            won = scores[winner] * 5
+            won = game["words"][winner] * 5
             add_points(winner, winner_data["name"], won)
-            send(f"🏆 {winner_data['name']} فاز في حرب الكلمات! {scores[winner]} كلمة | +{won} نقطة 🚫💸")
+            send(f"🏆 {winner_data['name']} فاز في حرب الكلمات! {game['words'][winner]} كلمة | +{won} نقطة 🚫💸")
         del active_games[live_chat_id]
 
     def game_million():
-        active_games[live_chat_id] = {"type": "million", "step": 0, "prize": 0}
+        active_games[live_chat_id] = {"type": "million", "step": 0}
         send("💰 من سيربح النقاط! اول سؤال: عاصمة الجزائر؟ أ: وهران ب: الجزائر ج: قسنطينة 🚫💸")
 
     def game_kanz():
@@ -207,30 +206,24 @@ def start_bot():
         send(f"⚡ تحدي سرعة! حل: {num1} + {num2} = ؟ 🚫💸")
 
     def game_qatil():
-        active_games[live_chat_id] = {"type": "qatil", "victim": None}
+        active_games[live_chat_id] = {"type": "qatil", "killer": None}
         send("🔪 من القاتل! واحد منكم هو القاتل. اكتب 'اتهم @اسم' 🚫💸")
 
     def game_borsa():
         price = random.randint(50, 200)
-        active_games[live_chat_id] = {"type": "borsa", "price": price}
+        active_games[live_chat_id] = {"type": "borsa", "price": price, "holders": {}}
         send(f"📈 بورصة النقاط! سعر السهم ضرك: {price}. اكتب 'بيع' او 'شراء' 🚫💸")
 
     def game_mamlaka():
-        active_games[live_chat_id] = {"type": "mamlaka", "king": None, "tax": 0}
+        active_games[live_chat_id] = {"type": "mamlaka", "king": None}
         send("🏰 مملكة الجلادين! اول واحد يكتب 'انا الملك' يولي ملك ويجمع الضرائب 🚫💸")
 
     next_page_token = None
-    bot_start_time = time.time()
-    game_started = False
 
     while True:
         try:
             res = youtube.liveChatMessages().list(liveChatId=live_chat_id, part="snippet,authorDetails", pageToken=next_page_token).execute()
             
-            if not game_started and time.time() - bot_start_time > 80:
-                game_started = True
-                send("🎮 كل الألعاب تفعلت! اكتب اسم اللعبة + start 🚫💸")
-
             for item in res['items']:
                 msg = item['snippet']['displayMessage'].strip()
                 author = item['authorDetails']['displayName']
@@ -267,8 +260,8 @@ def start_bot():
                         send(f"✅ {author} شريت {SHOP[item]['desc']} 🚫💸")
                     else: send(f"❌ {author} ما تقدرش تشري")
 
-                # === بدء الألعاب 1-16 ===
-                elif game_started and live_chat_id not in active_games:
+                # === بدء الألعاب 1-16 فوري ===
+                elif live_chat_id not in active_games:
                     if msg == 'xo start': game_xo()
                     elif msg == 'مافيا start': game_mafia()
                     elif msg == 'rps start': game_rps()
@@ -286,7 +279,7 @@ def start_bot():
                     elif msg == 'بورصة start': game_borsa()
                     elif msg == 'مملكة start': game_mamlaka()
                 
-                # === ادخل للألعاب ===
+                # === ادخل ===
                 elif msg == 'ادخل' and live_chat_id in active_games:
                     game = active_games[live_chat_id]
                     if game["type"] == "mafia" and not game["started"]:
@@ -296,7 +289,7 @@ def start_bot():
                         game["players"].append({"uid": uid, "name": author})
                         send(f"✅ {author} دخل للسجن")
 
-                # === منطق كل الألعاب ===
+                # === منطق الألعاب ===
                 elif live_chat_id in active_games:
                     game = active_games[live_chat_id]
                     t = game["type"]
@@ -363,7 +356,7 @@ def start_bot():
                         del active_games[live_chat_id]
                     
                     elif t == "kalimat":
-                        game["words"].append((uid, msg))
+                        game["words"][uid] = game["words"].get(uid, 0) + 1
                     
                     elif t == "kanz" and msg.startswith('كنز '):
                         try:
@@ -393,7 +386,7 @@ def start_bot():
                         send(f"💰 الملك {author} جمع {tax} نقطة ضريبة! 🚫💸")
 
             next_page_token = res.get('nextPageToken')
-            time.sleep(5)
+            time.sleep(3)
         except Exception as e:
             print(f"💀 Error: {e}")
             time.sleep(15)
