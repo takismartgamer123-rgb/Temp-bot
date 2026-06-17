@@ -1,38 +1,26 @@
 import sqlite3
-
 class Database:
     def __init__(self):
-        self.db = sqlite3.connect('infinity.db', check_same_thread=False)
-        self.init_db()
-
-    def init_db(self):
-        self.db.execute('''CREATE TABLE IF NOT EXISTS users
-                        (username TEXT PRIMARY KEY,
-                         points INT DEFAULT 0,
-                         inventory TEXT DEFAULT '{}',
-                         bank INT DEFAULT 0,
-                         last_daily TIMESTAMP,
-                         shield INT DEFAULT 0,
-                         last_steal TIMESTAMP,
-                         vip INT DEFAULT 0)''')
-        self.db.commit()
-
-    def add_user(self, username):
-        self.db.execute("INSERT OR IGNORE INTO users (username) VALUES (?)", (username,))
-        self.db.commit()
-
-    def get_points(self, username):
-        return self.db.execute("SELECT points FROM users WHERE username=?",(username,)).fetchone()[0]
-
-    def add_points(self, username, amount):
-        self.db.execute("UPDATE users SET points=points+? WHERE username=?", (amount, username))
-        self.db.commit()
-
-    def get_user_data(self, username):
-        return self.db.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
-
-    def execute(self, query, params=()):
-        return self.db.execute(query, params)
-
-    def commit(self):
-        self.db.commit()
+        self.db = "bot.db"
+        self.init()
+    def init(self):
+        with sqlite3.connect(self.db) as c:
+            c.execute("CREATE TABLE IF NOT EXISTS users (username TEXT PRIMARY KEY, points INTEGER DEFAULT 100)")
+            c.execute("CREATE TABLE IF NOT EXISTS items (username TEXT, item TEXT)")
+    def add_user(self, u):
+        with sqlite3.connect(self.db) as c:
+            c.execute("INSERT OR IGNORE INTO users VALUES (?,100)", (u.lower(),))
+    def add_points(self, u, p):
+        self.add_user(u)
+        with sqlite3.connect(self.db) as c:
+            c.execute("UPDATE users SET points=points+? WHERE username=?", (p, u.lower()))
+    def get_points(self, u):
+        with sqlite3.connect(self.db) as c:
+            r = c.execute("SELECT points FROM users WHERE username=?", (u.lower(),)).fetchone()
+            return r[0] if r else 0
+    def add_item(self, u, i):
+        with sqlite3.connect(self.db) as c:
+            c.execute("INSERT INTO items VALUES (?,?)", (u.lower(), i))
+    def get_items(self, u):
+        with sqlite3.connect(self.db) as c:
+            return [x[0] for x in c.execute("SELECT item FROM items WHERE username=?", (u.lower(),)).fetchall()]
